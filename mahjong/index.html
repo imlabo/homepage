@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f5a45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>雀卓ランキング</title>
+<script src="config.js"></script>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one-column phone app — felt-green header band, ivory "tile" rows, fixed bottom tab bar for thumb reach */
+:root{
+  --felt:#1f5a45; --felt-deep:#164233; --tile:#fbf8f0; --bg:#eef0ea; --ink:#1d2621; --muted:#66716a;
+  --line:#d8ddd4; --red:#c8322b; --gold:#b8892b; --on-felt:#f4f1e6; --chip:#e3e8df;
+  --good:#2d7a4f; --bad:#b0392f;
+  --f-display:"Dela Gothic One","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --nav-h:64px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --felt:#1a4c3b; --felt-deep:#10302a; --tile:#1c2420; --bg:#121815; --ink:#e7ebe5; --muted:#9aa59e;
+  --line:#2c3833; --red:#ef5b52; --gold:#d9ad55; --on-felt:#eef0e6; --chip:#26312c; --good:#5cc08a; --bad:#ee6f64; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --felt:#1a4c3b; --felt-deep:#10302a; --tile:#1c2420; --bg:#121815; --ink:#e7ebe5; --muted:#9aa59e;
+  --line:#2c3833; --red:#ef5b52; --gold:#d9ad55; --on-felt:#eef0e6; --chip:#26312c; --good:#5cc08a; --bad:#ee6f64; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--felt)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+
+header.top{background:var(--felt);color:var(--on-felt);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+header.top .wrap{padding-block:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:20px;letter-spacing:.04em}
+header .sub{font-size:12px;opacity:.75}
+.rulebadge{font-size:12px;border:1px solid color-mix(in srgb,var(--on-felt) 40%,transparent);border-radius:999px;padding:3px 10px;white-space:nowrap}
+
+main{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 24px)}
+section[data-view]{display:flex;flex-direction:column;gap:14px;padding-block:16px}
+h2{margin:0;font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+
+.notice{font-size:13px;background:var(--chip);border-radius:10px;padding:10px 12px;color:var(--muted)}
+.notice b{color:var(--ink)}
+
+/* chips */
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--tile);font-size:14px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--felt);border-color:var(--felt);color:var(--on-felt)}
+
+/* ranking */
+.podium{display:grid;grid-template-columns:1fr;gap:10px}
+.rk{background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;grid-template-columns:44px 1fr auto;gap:4px 12px;align-items:center;width:100%;text-align:left}
+.rk .pos{font-family:var(--f-display);font-size:26px;line-height:1;text-align:center;color:var(--muted);grid-row:span 2}
+.rk.p1 .pos{color:var(--gold)} .rk.p2 .pos{color:var(--ink)} .rk.p3 .pos{color:var(--red)}
+.rk.p1{border-color:color-mix(in srgb,var(--gold) 55%,var(--line))}
+.rk .name{font-weight:700;font-size:17px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .pt{font-family:var(--f-num);font-weight:700;font-size:20px;text-align:right}
+.rk .meta{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.rk .meta b{color:var(--ink);font-family:var(--f-num);font-weight:500}
+.dist{grid-column:2 / 4;display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--chip);margin-top:4px}
+.dist i{display:block;height:100%}
+.d1{background:var(--gold)} .d2{background:var(--felt)} .d3{background:var(--muted)} .d4{background:var(--red)}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0;background:var(--c)}
+.plus{color:var(--good)} .minus{color:var(--bad)}
+.sample-tag{display:inline-block;font-size:11px;font-weight:700;background:var(--gold);color:var(--tile);border-radius:4px;padding:1px 6px;letter-spacing:.06em}
+
+/* record form */
+.card{background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.row2{display:flex;gap:10px;align-items:center}
+.row2 label{font-size:13px;color:var(--muted);flex:none}
+.row2 input[type=date]{flex:1;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:0 12px}
+.seat{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center}
+.wind{width:34px;height:44px;border-radius:6px;background:var(--bg);border:1px solid var(--line);border-bottom-width:3px;display:grid;place-items:center;font-weight:700;font-size:17px}
+.wind.e{color:var(--red)}
+.seat input{min-height:48px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:0 12px;width:100%;min-width:0;font-size:16px}
+.scorebox{grid-column:2 / 4;display:flex;align-items:center;gap:8px}
+.sign{flex:none;width:48px;height:48px;border-radius:10px;border:1px solid var(--line);background:var(--chip);font-weight:700;font-size:20px}
+.sign[aria-pressed="true"]{background:var(--red);color:#fff;border-color:var(--red)}
+.score{position:relative;flex:1;min-width:0}
+.score input{font-family:var(--f-num);font-size:20px;text-align:right;padding-right:42px}
+.score .zz{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-family:var(--f-num);font-size:20px;color:var(--muted);pointer-events:none}
+.preview{flex:none;min-width:64px;text-align:right;font-family:var(--f-num);font-size:14px;font-weight:700}
+.seat + .seat{border-top:1px dashed var(--line);padding-top:12px}
+.sum{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:10px 12px;border-radius:10px;background:var(--bg)}
+.sum.ok{color:var(--good)} .sum.ng{color:var(--bad)}
+.btn{min-height:52px;border-radius:12px;border:none;background:var(--felt);color:var(--on-felt);font-weight:700;font-size:16px;width:100%}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);min-height:44px;font-size:14px}
+.hint{font-size:12px;color:var(--muted);margin:0}
+
+/* history */
+.game{background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.game .gh{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
+.game table{width:100%;border-collapse:collapse;font-size:14px}
+.game td{padding:4px 0}
+.game td.r{width:28px;font-family:var(--f-display);color:var(--muted)}
+.game tr:first-child td.r{color:var(--gold)}
+.game td.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:100%}
+.game td.s,.game td.p{text-align:right;font-family:var(--f-num);white-space:nowrap;padding-left:10px}
+.del{border:none;background:none;color:var(--muted);font-size:13px;min-height:36px;padding:0 4px}
+.del.arm{color:var(--bad);font-weight:700}
+.empty{text-align:center;color:var(--muted);padding:32px 12px;font-size:14px}
+
+/* rules */
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;color:var(--muted)}
+.field input{min-height:48px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:0 12px;font-family:var(--f-num);font-size:17px;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grid4 input{text-align:center;padding:0 4px}
+
+/* bottom nav */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--tile);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+  display:grid;grid-template-columns:repeat(5,1fr)}
+nav.tabs button{height:var(--nav-h);border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--muted)}
+nav.tabs button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8}
+nav.tabs button[aria-current="page"]{color:var(--felt);font-weight:700}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) nav.tabs button[aria-current="page"]{color:var(--gold)}}
+:root[data-theme="dark"] nav.tabs button[aria-current="page"]{color:var(--gold)}
+nav.tabs button.rec span.ic{width:44px;height:30px;border-radius:15px;background:var(--felt);color:var(--on-felt);display:grid;place-items:center}
+
+/* photo read */
+.photo-card{border-color:color-mix(in srgb,var(--felt) 45%,var(--line))}
+label.btn{display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+label.btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+label.btn.busy{opacity:.6;pointer-events:none}
+.pr{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:start}
+.pr img{width:88px;height:66px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.pr ul{list-style:none;margin:0;padding:0;font-size:14px;display:flex;flex-direction:column;gap:2px}
+.pr li{display:flex;justify-content:space-between;gap:8px}
+.pr li span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr .st{grid-column:1 / -1;font-size:13px;padding:8px 10px;border-radius:8px;background:var(--bg)}
+.pr .st.ok{color:var(--good)} .pr .st.ng{color:var(--bad)}
+.refimg{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr,64px));z-index:4;background:var(--bg);padding-block:6px;margin-block:-6px}
+.refimg img{display:block;width:100%;max-height:160px;object-fit:contain;border-radius:10px;background:#000;cursor:zoom-in}
+.refimg.big img{max-height:62vh;cursor:zoom-out}
+.score.auto::before{content:"自動";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;color:var(--felt);pointer-events:none}
+.score.auto input{border-style:dashed}
+details.tbl summary{cursor:pointer;font-size:13px;color:var(--muted);min-height:36px;display:flex;align-items:center}
+details.tbl[open] summary{margin-bottom:8px}
+.tblgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* yakuman */
+.ykgrid{display:flex;flex-wrap:wrap;gap:8px}
+.ykgrid .chip{min-height:42px}
+.ykgrid .chip[aria-pressed="true"]{background:var(--red);border-color:var(--red);color:#fff}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{min-height:44px;border:none;background:var(--bg);font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--felt);color:var(--on-felt)}
+.txt{min-height:48px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:0 12px;width:100%;min-width:0;font-size:16px}
+.yk{background:var(--tile);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.yk .yn{font-family:var(--f-display);font-size:20px;line-height:1.3;color:var(--red);text-wrap:balance}
+.yk .yn small{font-family:var(--f-body);font-size:12px;font-weight:700;color:var(--gold);margin-left:6px;vertical-align:2px}
+.yk .yw{font-weight:700;font-size:16px}
+.yk .ym{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);align-items:center}
+.yk .memo{font-size:13px;color:var(--muted)}
+.tally{display:flex;flex-wrap:wrap;gap:8px}
+.tally span{background:var(--tile);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px}
+.tally b{font-family:var(--f-num);color:var(--red);margin-left:4px}
+/* player sheet */
+button.rk{font:inherit;color:inherit;cursor:pointer}
+button.rk:active{transform:scale(.99)}
+.rk .go{grid-column:3;grid-row:1;display:none}
+.sheet{position:fixed;inset:0;z-index:8;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet-head{position:sticky;top:0;background:var(--felt);color:var(--on-felt);padding-top:env(safe-area-inset-top,0px);z-index:1}
+.sheet-head .wrap{display:flex;align-items:center;gap:8px;padding-block:8px}
+.back{min-width:44px;min-height:44px;border:none;background:none;color:inherit;font-size:15px;font-weight:700;display:flex;align-items:center;gap:2px;padding:0 6px 0 0}
+.back svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2}
+.sheet-head h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:19px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-body{display:flex;flex-direction:column;gap:14px;padding-block:16px calc(24px + env(safe-area-inset-bottom,0px))}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--tile);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.stat span{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.stat b{font-family:var(--f-num);font-size:18px;font-weight:700}
+.stat.big{grid-column:1 / -1;flex-direction:row;justify-content:space-between;align-items:baseline}
+.stat.big b{font-size:28px}
+.rkbars{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13px}
+.rkbars .bar{height:10px;border-radius:5px;background:var(--chip);overflow:hidden}
+.rkbars .bar i{display:block;height:100%}
+.h2h{width:100%;border-collapse:collapse;font-size:14px}
+.h2h th{font-size:11px;color:var(--muted);font-weight:500;text-align:right;padding:0 0 6px 8px}
+.h2h th:first-child{text-align:left;padding-left:0}
+.h2h td{padding:9px 0 9px 8px;border-top:1px solid var(--line);text-align:right;font-family:var(--f-num);white-space:nowrap}
+.h2h td:first-child{text-align:left;padding-left:0;font-family:var(--f-body);font-weight:700;white-space:normal;word-break:break-all}
+.wl{display:inline-flex;height:6px;width:44px;border-radius:3px;overflow:hidden;background:var(--chip);vertical-align:middle;margin-right:6px}
+.wl i{display:block;height:100%;background:var(--good)}
+.tablewrap{overflow-x:auto}
+.recent .rr{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.recent .rr:first-child{border-top:none}
+.recent .rr .rkn{font-family:var(--f-display);width:22px;text-align:center}
+.recent .rr .rkn.r1{color:var(--gold)} .recent .rr .rkn.r4{color:var(--red)}
+.recent .rr .vs{font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 14px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;z-index:9;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+@media (min-width:640px){main,header.top .wrap{max-width:560px;margin-inline:auto}}
+</style>
+
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div><h1>雀卓ランキング</h1><div class="sub" id="sub">半荘成績をみんなで集計</div></div>
+  <span class="rulebadge" id="rulebadge">25000持ち / 30000返し</span>
+</div></header>
+
+<main class="wrap">
+  <!-- ランキング -->
+  <section data-view="rank">
+    <div class="chips" role="group" aria-label="集計期間">
+      <button class="chip" data-period="all" aria-pressed="true">全期間</button>
+      <button class="chip" data-period="month" aria-pressed="false">今月</button>
+      <button class="chip" data-period="last" aria-pressed="false">先月</button>
+      <button class="chip" data-period="year" aria-pressed="false">今年</button>
+    </div>
+    <div id="sampleNote" class="notice" hidden><span class="sample-tag">サンプル</span> まだ対局がないため例を表示しています。「記録」から最初の半荘を登録すると実データに切り替わります。</div>
+    <p class="hint">名前をタップすると、そのプレイヤーの対戦成績が開きます</p>
+    <div class="legend"><span style="--c:var(--gold)">1着</span><span style="--c:var(--felt)">2着</span><span style="--c:var(--muted)">3着</span><span style="--c:var(--red)">4着</span></div>
+    <div class="podium" id="ranking"></div>
+  </section>
+
+  <!-- 記録 -->
+  <section data-view="input" hidden>
+    <div id="roNote" class="notice" hidden>閲覧のみの権限です。記録するには共有メニューで編集権限をもらってください。</div>
+    <div class="card photo-card" id="photoCard">
+      <h2>全自動卓の点数表示から読み取る</h2>
+      <div>
+        <div class="hint" style="margin-bottom:6px">起家（東家）</div>
+        <div class="chips" id="oyaChips" role="group" aria-label="起家"></div>
+      </div>
+      <input type="file" id="photo" accept="image/*" hidden>
+      <label class="btn" for="photo" id="photoBtn"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>点数表示を撮る</label>
+      <p class="hint" id="photoHint">撮った写真が入力欄の上に固定表示されます。それを見ながら3人分の上3桁を入れると、残り1人は合計から自動で入ります。表示部分をアップで撮ると読みやすくなります。</p>
+      <button class="btn ghost" id="aiRead" hidden></button>
+      <div class="pr" id="photoResult" hidden></div>
+      <details class="tbl">
+        <summary>卓の並び（いつものメンバー）を変更</summary>
+        <div class="tblgrid" id="tblNames"></div>
+      </details>
+    </div>
+    <div class="card">
+      <div class="row2"><label for="gdate">対局日</label><input type="date" id="gdate"></div>
+      <div>
+        <h2 style="margin-bottom:8px">メンバー</h2>
+        <div class="chips" id="memberChips"></div>
+        <p class="hint" style="margin-top:6px">タップで空いている席に入ります</p>
+      </div>
+    </div>
+    <div class="refimg" id="refWrap" hidden><img id="refImg" alt="撮影した点数表示（タップで拡大・縮小）"></div>
+    <div class="card" id="seats"></div>
+    <div class="sum" id="sum"><span>合計</span><span class="num" id="sumv">0</span></div>
+    <button class="btn" id="save" disabled>この半荘を登録</button>
+    <p class="hint">点数は百点単位で入力（25300点 → 253）。同点は起家に近い席が上位。</p>
+  </section>
+
+  <!-- 履歴 -->
+  <section data-view="history" hidden>
+    <h2 id="histTitle">対局履歴</h2>
+    <div id="history" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <!-- 役満 -->
+  <section data-view="yakuman" hidden>
+    <div class="card" id="ykForm">
+      <h2>役満を記録</h2>
+      <div class="row2"><label for="ydate">日付</label><input type="date" id="ydate"></div>
+      <div class="field"><label for="ywho">あがった人</label><input class="txt" id="ywho" placeholder="名前" autocomplete="off"></div>
+      <div class="chips" id="ywhoChips"></div>
+      <div class="field"><label>役満（複合は複数選択）</label><div class="ykgrid" id="ykChips"></div></div>
+      <div class="seg" role="group" aria-label="あがり方"><button data-how="ツモ" aria-pressed="true">ツモ</button><button data-how="ロン" aria-pressed="false">ロン</button></div>
+      <div class="field" id="yfromWrap" hidden><label for="yfrom">放銃者</label><input class="txt" id="yfrom" placeholder="名前" autocomplete="off"></div>
+      <div class="field"><label for="ymemo">メモ（任意）</label><input class="txt" id="ymemo" placeholder="例：南3局 親 / 待ちは中単騎" autocomplete="off"></div>
+      <button class="btn" id="ysave" disabled>役満を登録</button>
+    </div>
+    <h2 id="ykTitle">役満リスト</h2>
+    <div class="tally" id="ykTally"></div>
+    <div id="ykList" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <!-- ルール -->
+  <section data-view="rule" hidden>
+    <div class="card">
+      <h2>持ち点・返し</h2>
+      <div class="grid2">
+        <div class="field"><label for="rStart">配給原点</label><input id="rStart" inputmode="numeric" value="25000"></div>
+        <div class="field"><label for="rRet">返し（原点）</label><input id="rRet" inputmode="numeric" value="30000"></div>
+      </div>
+      <h2>ウマ</h2>
+      <div class="chips" id="umaPresets">
+        <button class="chip" data-uma="30,10,-10,-30">10-30</button>
+        <button class="chip" data-uma="20,10,-10,-20">10-20</button>
+        <button class="chip" data-uma="10,5,-5,-10">5-10</button>
+        <button class="chip" data-uma="0,0,0,0">なし</button>
+      </div>
+      <div class="grid4">
+        <div class="field"><label for="u1">1着</label><input id="u1" inputmode="decimal"></div>
+        <div class="field"><label for="u2">2着</label><input id="u2" inputmode="decimal"></div>
+        <div class="field"><label for="u3">3着</label><input id="u3" inputmode="decimal"></div>
+        <div class="field"><label for="u4">4着</label><input id="u4" inputmode="decimal"></div>
+      </div>
+      <p class="hint" id="okaHint"></p>
+      <button class="btn" id="saveRule">ルールを保存</button>
+      <p class="hint">変更は今後の対局から反映。登録済みの半荘は当時のルールで計算したポイントのまま残ります。</p>
+    </div>
+    <div class="notice" id="storeNote">読み込み中…</div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="画面切り替え">
+  <button data-tab="rank" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>ランキング</button>
+  <button data-tab="input" class="rec"><span class="ic"><svg viewBox="0 0 24 24" style="width:20px;height:20px"><path d="M12 5v14M5 12h14"/></svg></span>記録</button>
+  <button data-tab="history"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>履歴</button>
+  <button data-tab="yakuman"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>役満</button>
+  <button data-tab="rule"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>ルール</button>
+</nav>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetName">
+  <div class="sheet-head"><div class="wrap">
+    <button class="back" id="sheetBack" aria-label="ランキングに戻る"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>戻る</button>
+    <h3 id="sheetName"></h3>
+  </div></div>
+  <div class="sheet-body wrap" id="sheetBody"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const WINDS=["東","南","西","北"];
+const DEFAULT_RULE={start:25000,ret:30000,uma:[30,10,-10,-30]};
+const S={games:[],rule:{...DEFAULT_RULE},db:null,canWrite:true,period:"all",tab:"rank",seats:[{n:"",v:"",neg:false},{n:"",v:"",neg:false},{n:"",v:"",neg:false},{n:"",v:"",neg:false}]};
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const r1=x=>Math.round(x*10)/10;
+const fmtPt=x=>(x>0?"+":x<0?"−":"±")+Math.abs(x).toFixed(1);
+const ptCls=x=>x>0?"plus":x<0?"minus":"";
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+
+/* 順位とポイント：同点は席順（起家寄り）優先 */
+function calc(scores,rule){
+  const order=scores.map((s,i)=>({s,i})).sort((a,b)=>b.s-a.s||a.i-b.i);
+  const ranks=Array(4), pts=Array(4);
+  const oka=(rule.ret-rule.start)*4/1000;
+  order.forEach((o,k)=>{ranks[o.i]=k+1; pts[o.i]=r1((o.s-rule.ret)/1000+(+rule.uma[k]||0)+(k===0?oka:0));});
+  return {ranks,pts};
+}
+
+/* サンプル（対局ゼロの時だけ画面表示、保存はしない） */
+function sampleGames(){
+  const rows=[["佐藤",[412,268,201,119]],["鈴木",[305,288,240,167]],["高橋",[355,301,198,146]],["田中",[279,262,250,209]],["佐藤",[388,247,225,140]]];
+  const names=["佐藤","鈴木","高橋","田中"];
+  return rows.map((r,gi)=>{const order=[...names.slice(gi%4),...names.slice(0,gi%4)];const sc=r[1].map(x=>x*100);const {ranks,pts}=calc(sc,DEFAULT_RULE);
+    return {date:today(),players:order.map((n,i)=>({name:n,score:sc[i],rank:ranks[i],pt:pts[i]}))};});
+}
+
+function inPeriod(g){
+  if(S.period==="all")return true;
+  const d=new Date(g.date+"T00:00:00"), n=new Date();
+  if(S.period==="month")return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth();
+  if(S.period==="year")return d.getFullYear()===n.getFullYear();
+  const lm=new Date(n.getFullYear(),n.getMonth()-1,1);
+  return d.getFullYear()===lm.getFullYear()&&d.getMonth()===lm.getMonth();
+}
+
+function renderRanking(){
+  const sample=S.games.length===0;
+  $("#sampleNote").hidden=!sample;
+  const games=(sample?sampleGames():S.games).filter(inPeriod);
+  const m=new Map();
+  for(const g of games)for(const p of g.players){
+    const a=m.get(p.name)||{name:p.name,pt:0,n:0,rs:[0,0,0,0],best:-Infinity};
+    a.pt=r1(a.pt+p.pt);a.n++;a.rs[p.rank-1]++;a.best=Math.max(a.best,p.score);m.set(p.name,a);
+  }
+  const list=[...m.values()].sort((a,b)=>b.pt-a.pt||b.n-a.n);
+  if(!list.length){$("#ranking").innerHTML=`<div class="empty">この期間の対局はまだありません</div>`;return;}
+  $("#ranking").innerHTML=list.map((a,i)=>{
+    const avg=(a.rs.reduce((s,c,k)=>s+c*(k+1),0)/a.n).toFixed(2);
+    const top=(a.rs[0]/a.n*100).toFixed(0), las=((1-a.rs[3]/a.n)*100).toFixed(0);
+    return `<button class="rk p${i+1}" data-player="${esc(a.name)}" aria-label="${esc(a.name)}の対戦成績を開く">
+      <div class="pos">${i+1}</div>
+      <div class="name">${esc(a.name)}</div>
+      <div class="pt ${ptCls(a.pt)}">${fmtPt(a.pt)}</div>
+      <div class="meta"><span><b>${a.n}</b>半荘</span><span>平均 <b>${avg}</b>位</span><span>トップ <b>${top}</b>%</span><span>ラス回避 <b>${las}</b>%</span><span>最高 <b>${a.best.toLocaleString()}</b></span></div>
+      <div class="dist" aria-label="1着${a.rs[0]}回 2着${a.rs[1]}回 3着${a.rs[2]}回 4着${a.rs[3]}回">${a.rs.map((c,k)=>`<i class="d${k+1}" style="width:${c/a.n*100}%"></i>`).join("")}</div>
+    </button>`;}).join("");
+}
+
+function knownNames(){
+  const m=new Map();
+  for(const g of S.games)for(const p of g.players)m.set(p.name,(m.get(p.name)||0)+1);
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+}
+
+function renderMemberChips(){
+  const used=new Set(S.seats.map(s=>s.n.trim()));
+  const names=knownNames();
+  $("#memberChips").innerHTML=names.length?names.map(n=>`<button class="chip" data-name="${esc(n)}" aria-pressed="${used.has(n)}">${esc(n)}</button>`).join("")
+    :`<span class="hint">登録したメンバーがここに並びます。まずは名前を直接入力してください。</span>`;
+}
+
+function seatScores(){return S.seats.map(s=>{const v=parseInt(s.v,10);return isNaN(v)?null:(s.neg?-v:v)*100;});}
+
+function renderSeats(){
+  $("#seats").innerHTML=S.seats.map((s,i)=>`<div class="seat">
+    <div class="wind ${i===0?"e":""}" aria-hidden="true">${WINDS[i]}</div>
+    <input id="n${i}" data-i="${i}" class="nm" placeholder="${WINDS[i]}家の名前" value="${esc(s.n)}" autocomplete="off" enterkeyhint="next" aria-label="${WINDS[i]}家の名前">
+    <span class="preview" id="pv${i}"></span>
+    <div class="scorebox">
+      <button class="sign" data-i="${i}" aria-pressed="${s.neg}" aria-label="マイナス切り替え">−</button>
+      <div class="score${s.auto?" auto":""}"><input id="s${i}" data-i="${i}" class="sc" inputmode="numeric" pattern="[0-9]*" placeholder="250" value="${esc(s.v)}" aria-label="${WINDS[i]}家の点数（百点単位）" enterkeyhint="${i<3?"next":"done"}"><span class="zz">00</span></div>
+    </div></div>`).join("");
+  updateSum();
+}
+
+function updateSum(){
+  const sc=seatScores(), target=S.rule.start*4;
+  const filled=sc.every(v=>v!==null), sum=sc.reduce((a,v)=>a+(v||0),0);
+  const names=S.seats.map(s=>s.n.trim()), namesOk=names.every(Boolean)&&new Set(names).size===4;
+  const el=$("#sum");
+  el.className="sum"+(filled?(sum===target?" ok":" ng"):"");
+  $("#sumv").textContent=filled?(sum===target?`${sum.toLocaleString()} ✓`:`${sum.toLocaleString()}（${sum>target?"+":""}${(sum-target).toLocaleString()}）`):`${sum.toLocaleString()} / ${target.toLocaleString()}`;
+  if(filled){const {ranks,pts}=calc(sc,S.rule);pts.forEach((p,i)=>{const e=$("#pv"+i);e.className="preview "+ptCls(p);e.textContent=ranks[i]+"着 "+fmtPt(p);});}
+  else S.seats.forEach((_,i)=>{const e=$("#pv"+i);if(e){e.className="preview";e.textContent="";}});
+  let reason="";
+  if(!S.canWrite)reason="閲覧のみ";
+  else if(!namesOk)reason=names.every(Boolean)?"同じ名前が重複しています":"4人の名前を入力";
+  else if(!filled)reason="4人の点数を入力";
+  else if(sum!==target)reason="合計が合いません";
+  const b=$("#save");b.disabled=!!reason;b.textContent=reason||"この半荘を登録";
+}
+
+function renderHistory(){
+  const gs=S.games;
+  $("#histTitle").textContent=`対局履歴（${gs.length}半荘）`;
+  if(!gs.length){$("#history").innerHTML=`<div class="empty">まだ対局がありません。<br>下の「記録」から登録できます。</div>`;return;}
+  $("#history").innerHTML=gs.map(g=>{
+    const ps=[...g.players].sort((a,b)=>a.rank-b.rank);
+    return `<div class="game"><div class="gh"><span class="num">${esc(g.date)}</span>${S.canWrite?`<button class="del" data-id="${esc(g.id)}">削除</button>`:""}</div>
+      <table>${ps.map(p=>`<tr><td class="r">${p.rank}</td><td class="n">${esc(p.name)}</td><td class="s">${p.score.toLocaleString()}</td><td class="p ${ptCls(p.pt)}">${fmtPt(p.pt)}</td></tr>`).join("")}</table></div>`;}).join("");
+}
+
+function renderRule(){
+  const r=S.rule;
+  $("#rStart").value=r.start;$("#rRet").value=r.ret;
+  r.uma.forEach((u,i)=>$("#u"+(i+1)).value=u);
+  $$("#umaPresets .chip").forEach(c=>c.setAttribute("aria-pressed",c.dataset.uma===r.uma.join(",")));
+  updateOka();
+  const umaTxt=r.uma[0]===0&&r.uma[1]===0?"ウマなし":`ウマ${Math.abs(r.uma[1])}-${Math.abs(r.uma[0])}`;
+  $("#rulebadge").textContent=`${r.start/1000}持ち${r.ret/1000}返し・${umaTxt}`;
+}
+function updateOka(){
+  const s=+$("#rStart").value||0, t=+$("#rRet").value||0;
+  const oka=(t-s)*4/1000;
+  $("#okaHint").textContent=oka>0?`オカ +${oka.toFixed(1)}pt はトップ取り`:oka<0?`オカ ${oka.toFixed(1)}pt（返しが原点より低い設定です）`:"オカなし";
+}
+
+function renderAll(){renderPlayer();renderRanking();renderMemberChips();renderHistory();renderRule();updateSum();renderYkForm();renderYakuman();
+  $("#roNote").hidden=S.canWrite;$("#saveRule").disabled=!S.canWrite;}
+
+function setTab(t){
+  S.tab=t;$$("section[data-view]").forEach(s=>s.hidden=s.dataset.view!==t);
+  $$("nav.tabs button").forEach(b=>b.dataset.tab===t?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
+  window.scrollTo(0,0);
+}
+
+let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),2000);}
+
+/* ---- 保存先：共有DB（なければこの端末） ---- */
+const LS="mj-ranking-v1";
+function lsLoad(){try{const d=JSON.parse(localStorage.getItem(LS)||"null");if(d){S.games=d.games||[];S.rule=d.rule||S.rule;S.yaku=d.yaku||[];}}catch(e){}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify({games:S.games,rule:S.rule,yaku:S.yaku}));}catch(e){}}
+
+async function addGame(g){
+  if(S.db){await S.db.collection("games").add(g);}
+  else{g.id="g"+Date.now();S.games.unshift(g);S.games.sort((a,b)=>b.date.localeCompare(a.date)||b.at-a.at);lsSave();renderAll();}
+}
+async function delGame(id){
+  if(S.db){await S.db.collection("games").doc(id).delete();}
+  else{S.games=S.games.filter(g=>g.id!==id);lsSave();renderAll();}
+}
+async function saveRule(r){
+  if(S.db){await S.db.doc("config/rule").set(r);}else{S.rule=r;lsSave();renderAll();}
+}
+
+/* ---- events ---- */
+$$("nav.tabs button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+$$("[data-period]").forEach(b=>b.onclick=()=>{S.period=b.dataset.period;$$("[data-period]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderRanking();});
+
+$("#seats").addEventListener("input",e=>{
+  const i=+e.target.dataset.i;
+  if(e.target.classList.contains("nm")){S.seats[i].n=e.target.value;renderMemberChips();}
+  if(e.target.classList.contains("sc")){const v=e.target.value.replace(/[^0-9]/g,"");if(v!==e.target.value)e.target.value=v;S.seats[i].v=v;
+    if(S.seats[i].auto){S.seats[i].auto=false;e.target.parentElement.classList.remove("auto");}autoFill();}
+  updateSum();
+});
+$("#seats").addEventListener("keydown",e=>{
+  if(e.key!=="Enter")return;const id=e.target.id;const i=+e.target.dataset.i;
+  const next=id.startsWith("n")?$("#s"+i):$("#n"+(i+1));
+  if(next){e.preventDefault();next.focus();}else e.target.blur();
+});
+$("#seats").addEventListener("click",e=>{
+  const b=e.target.closest(".sign");if(!b)return;const i=+b.dataset.i;
+  S.seats[i].neg=!S.seats[i].neg;b.setAttribute("aria-pressed",S.seats[i].neg);
+  if(S.seats[i].auto){S.seats[i].auto=false;syncSeat(i);}autoFill();updateSum();
+});
+$("#memberChips").addEventListener("click",e=>{
+  const c=e.target.closest(".chip");if(!c)return;const n=c.dataset.name;
+  const at=S.seats.findIndex(s=>s.n.trim()===n);
+  if(at>=0){S.seats[at].n="";}
+  else{const free=S.seats.findIndex(s=>!s.n.trim());if(free<0){toast("4席とも埋まっています");return;}S.seats[free].n=n;}
+  S.seats.forEach((s,i)=>$("#n"+i).value=s.n);renderMemberChips();updateSum();
+});
+
+$("#save").onclick=async()=>{
+  const sc=seatScores();const {ranks,pts}=calc(sc,S.rule);
+  const g={date:$("#gdate").value||today(),at:Date.now(),
+    rule:{start:S.rule.start,ret:S.rule.ret,uma:[...S.rule.uma]},
+    players:S.seats.map((s,i)=>({name:s.n.trim(),seat:i,score:sc[i],rank:ranks[i],pt:pts[i]}))};
+  const b=$("#save");b.disabled=true;b.textContent="登録中…";
+  try{await addGame(g);
+    S.seats.forEach(s=>{s.v="";s.neg=false;s.auto=false;}); // 名前は次の半荘のため残す
+    S.lastRead=null;S.lastFile=null;$("#photoResult").hidden=true;$("#refWrap").hidden=true;$("#aiRead").hidden=true;
+    renderSeats();toast("登録しました");
+  }catch(err){toast(err&&err.code==="quota_exceeded"?"保存容量の上限です。古い対局を削除してください":"登録できませんでした。通信を確認してもう一度");updateSum();}
+};
+
+$("#history").addEventListener("click",async e=>{
+  const b=e.target.closest(".del");if(!b)return;
+  if(!b.classList.contains("arm")){b.classList.add("arm");b.textContent="もう一度タップで削除";setTimeout(()=>{if(b.isConnected){b.classList.remove("arm");b.textContent="削除";}},3000);return;}
+  try{await delGame(b.dataset.id);toast("削除しました");}catch(err){toast("削除できませんでした");}
+});
+
+$("#umaPresets").addEventListener("click",e=>{const c=e.target.closest(".chip");if(!c)return;c.dataset.uma.split(",").forEach((u,i)=>$("#u"+(i+1)).value=u);
+  $$("#umaPresets .chip").forEach(x=>x.setAttribute("aria-pressed",x===c));});
+["#rStart","#rRet"].forEach(s=>$(s).addEventListener("input",updateOka));
+$("#saveRule").onclick=async()=>{
+  const r={start:parseInt($("#rStart").value,10),ret:parseInt($("#rRet").value,10),uma:[1,2,3,4].map(i=>parseFloat($("#u"+i).value))};
+  if(!(r.start>0)||!(r.ret>0)||r.uma.some(isNaN)){toast("数値を確認してください");return;}
+  if(Math.abs(r.uma.reduce((a,b)=>a+b,0))>0.001){toast("ウマの合計を0にしてください");return;}
+  try{await saveRule(r);toast("ルールを保存しました");}catch(err){toast("保存できませんでした");}
+};
+
+/* ---- 役満 ---- */
+const YAKUMAN=["国士無双","国士無双十三面","四暗刻","四暗刻単騎","大三元","字一色","小四喜","大四喜","緑一色","清老頭","四槓子","九蓮宝燈","純正九蓮宝燈","天和","地和","数え役満"];
+S.yaku=[];S.yk={sel:[],how:"ツモ"};
+const MULTI=["","","ダブル役満","トリプル役満","四倍役満","五倍役満"];
+function renderYkForm(){
+  $("#ykChips").innerHTML=YAKUMAN.map(y=>`<button class="chip" data-yk="${y}" aria-pressed="${S.yk.sel.includes(y)}">${y}</button>`).join("");
+  const names=[...new Set([...knownNames(),...S.yaku.map(y=>y.who)])];
+  const who=$("#ywho").value.trim();
+  $("#ywhoChips").innerHTML=names.map(n=>`<button class="chip" data-who="${esc(n)}" aria-pressed="${n===who}">${esc(n)}</button>`).join("");
+  $$(".seg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.how===S.yk.how));
+  $("#yfromWrap").hidden=S.yk.how!=="ロン";
+  updateYkBtn();
+}
+function updateYkBtn(){
+  const b=$("#ysave");let r="";
+  if(!S.canWrite)r="閲覧のみ";else if(!$("#ywho").value.trim())r="あがった人を入力";else if(!S.yk.sel.length)r="役満を選択";
+  b.disabled=!!r;b.textContent=r||(S.yk.sel.length>1?MULTI[S.yk.sel.length]+"を登録":"役満を登録");
+}
+function renderYakuman(){
+  const ys=S.yaku;
+  $("#ykTitle").textContent=`役満リスト（${ys.length}回）`;
+  const t=new Map();ys.forEach(y=>t.set(y.who,(t.get(y.who)||0)+1));
+  $("#ykTally").innerHTML=[...t.entries()].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<span>${esc(n)}<b>${c}</b></span>`).join("");
+  if(!ys.length){$("#ykList").innerHTML=`<div class="empty">まだ役満は出ていません。<br>出たら上のフォームから記録しましょう。</div>`;return;}
+  $("#ykList").innerHTML=ys.map(y=>{const k=(y.yaku||[]).length;
+    return `<div class="yk">
+      <div class="yn">${(y.yaku||[]).map(esc).join("・")}${k>1?`<small>${MULTI[k]||k+"倍役満"}</small>`:""}</div>
+      <div class="yw">${esc(y.who)}</div>
+      <div class="ym"><span class="num">${esc(y.date)}</span><span>${esc(y.how)}${y.how==="ロン"&&y.from?`（放銃：${esc(y.from)}）`:""}</span>
+        ${S.canWrite?`<button class="del" data-yid="${esc(y.id)}" style="margin-left:auto">削除</button>`:""}</div>
+      ${y.memo?`<div class="memo">${esc(y.memo)}</div>`:""}
+    </div>`;}).join("");
+}
+$("#ykChips").addEventListener("click",e=>{const c=e.target.closest(".chip");if(!c)return;const y=c.dataset.yk;
+  S.yk.sel=S.yk.sel.includes(y)?S.yk.sel.filter(x=>x!==y):[...S.yk.sel,y];c.setAttribute("aria-pressed",S.yk.sel.includes(y));updateYkBtn();});
+$("#ywhoChips").addEventListener("click",e=>{const c=e.target.closest(".chip");if(!c)return;$("#ywho").value=c.dataset.who;renderYkForm();});
+$("#ywho").addEventListener("input",()=>{$$("#ywhoChips .chip").forEach(c=>c.setAttribute("aria-pressed",c.dataset.who===$("#ywho").value.trim()));updateYkBtn();});
+$$(".seg button").forEach(b=>b.onclick=()=>{S.yk.how=b.dataset.how;renderYkForm();});
+$("#ysave").onclick=async()=>{
+  const y={date:$("#ydate").value||today(),at:Date.now(),who:$("#ywho").value.trim(),yaku:[...S.yk.sel],how:S.yk.how,
+    from:S.yk.how==="ロン"?$("#yfrom").value.trim():"",memo:$("#ymemo").value.trim()};
+  const b=$("#ysave");b.disabled=true;b.textContent="登録中…";
+  try{
+    if(S.db)await S.db.collection("yakuman").add(y);
+    else{y.id="y"+Date.now();S.yaku.unshift(y);lsSave();renderAll();}
+    S.yk.sel=[];$("#yfrom").value="";$("#ymemo").value="";renderYkForm();toast("役満を登録しました");
+  }catch(err){toast("登録できませんでした。通信を確認してもう一度");updateYkBtn();}
+};
+$("#ykList").addEventListener("click",async e=>{
+  const b=e.target.closest(".del");if(!b)return;
+  if(!b.classList.contains("arm")){b.classList.add("arm");b.textContent="もう一度タップで削除";setTimeout(()=>{if(b.isConnected){b.classList.remove("arm");b.textContent="削除";}},3000);return;}
+  try{if(S.db)await S.db.collection("yakuman").doc(b.dataset.yid).delete();else{S.yaku=S.yaku.filter(y=>y.id!==b.dataset.yid);lsSave();renderAll();}toast("削除しました");}
+  catch(err){toast("削除できませんでした");}
+});
+
+/* ---- 写真から読み取り ---- */
+const POS=[["self","手前（自分）"],["shimo","右（下家）"],["toimen","奥（対面）"],["kami","左（上家）"]];
+S.table={self:"齊藤",shimo:"福田",toimen:"三谷",kami:"阿部"};S.oya=0;S.sample=null;S.lastRead=null;S.lastImg=null;
+const TBL_LS="mj-table-v1";
+try{const t=JSON.parse(localStorage.getItem(TBL_LS)||"null");if(t&&t.self)S.table=t;}catch(e){}
+function renderTable(){
+  $("#tblNames").innerHTML=POS.map(([k,l],i)=>`<div class="field"><label for="tp${i}">${l}</label><input class="txt" id="tp${i}" data-k="${k}" value="${esc(S.table[k]||"")}" autocomplete="off"></div>`).join("");
+  renderOya();
+}
+function renderOya(){$("#oyaChips").innerHTML=POS.map(([k],i)=>`<button class="chip" data-oya="${i}" aria-pressed="${S.oya===i}">${esc(S.table[k]||"?")}</button>`).join("");}
+$("#tblNames").addEventListener("input",e=>{const k=e.target.dataset.k;if(!k)return;S.table[k]=e.target.value.trim();renderOya();});
+$("#tblNames").addEventListener("change",async()=>{
+  try{localStorage.setItem(TBL_LS,JSON.stringify(S.table));}catch(e){}
+  if(S.db&&S.canWrite){try{await S.db.doc("config/table").set({...S.table});}catch(e){}}
+  if(S.lastRead)applyRead(S.lastRead);else applyNames();
+});
+$("#oyaChips").addEventListener("click",e=>{const c=e.target.closest(".chip");if(!c)return;S.oya=+c.dataset.oya;renderOya();
+  if(S.lastRead)applyRead(S.lastRead);else{
+    /* 点数は人に付いているので、席を回しても人ごとの点数を保つ */
+    const byName=new Map(S.seats.map(s=>[s.n.trim(),{v:s.v,neg:s.neg,auto:s.auto}]));
+    applyNames();S.seats.forEach(s=>Object.assign(s,byName.get(s.n.trim())||{v:"",neg:false,auto:false}));renderSeats();}});
+
+function applyRead(r){
+  const byPos=[r.bottom,r.right,r.top,r.left], keys=POS.map(p=>p[0]);
+  for(let s=0;s<4;s++){const pi=(S.oya+s)%4, v=byPos[pi];
+    S.seats[s].n=S.table[keys[pi]]||"";S.seats[s].neg=v<0;S.seats[s].auto=false;S.seats[s].v=String(Math.round(Math.abs(v)/100));}
+  renderSeats();renderMemberChips();renderPhotoResult();
+}
+function renderPhotoResult(){
+  const r=S.lastRead,el=$("#photoResult");if(!r){el.hidden=true;return;}
+  const byPos=[r.bottom,r.right,r.top,r.left], keys=POS.map(p=>p[0]);
+  const sum=byPos.reduce((a,b)=>a+b,0), target=S.rule.start*4;
+  const diffs=[["diffRight",r.right],["diffTop",r.top],["diffLeft",r.left]].filter(([k])=>typeof r[k]==="number");
+  const diffOk=diffs.every(([k,v])=>Math.abs(Math.abs(r.bottom-v)-Math.abs(r[k]))<1);
+  const sumOk=sum===target;
+  let st,cls;
+  if(sumOk&&diffOk){st=`合計 ${sum.toLocaleString()} ✓${diffs.length?"・点差とも一致":""}。下の内容で登録できます`;cls="ok";}
+  else if(!sumOk){st=`合計が ${sum.toLocaleString()} で ${target.toLocaleString()} と合いません。読み違いがないか下で直してください`;cls="ng";}
+  else{st="点差の表示と一部合いません。数字を確認してください";cls="ng";}
+  el.innerHTML=`${S.lastImg?`<img src="${S.lastImg}" alt="読み取った写真">`:"<span></span>"}
+    <ul>${POS.map(([k,l],i)=>`<li><span>${esc(S.table[k]||l)}</span><span class="num">${byPos[i].toLocaleString()}</span></li>`).join("")}</ul>
+    <div class="st ${cls}">${st}</div>`;
+  el.hidden=false;
+}
+const READ_PROMPT=`これは全自動麻雀卓の点数表示（液晶）の写真です。4人の持ち点を読み取ってください。
+表示の配置:
+- 中央下の一番大きい数字 = 手前（撮影者）の持ち点 → "bottom"
+- 右側の大きい数字 → "right"、上側中央の大きい数字 → "top"、左側の大きい数字 → "left"
+- 右・上・左の大きい数字の下にある小さい数字（記号付き）は手前との点差。記号は無視して絶対値を "diffRight" "diffTop" "diffLeft" に。無ければ null
+- 右上の CHECK の数字は合計 → "check"（無ければ null）
+- 1ST/2ND/3RD/4TH などの順位表示は無視
+持ち点がマイナスの人は負の数にしてください。7セグメント表示なので 0と8、1と7、5と6 の読み違いに注意し、点差・合計と矛盾しないか確かめてください。
+JSONのみで答えてください。例: {"bottom":31500,"right":24600,"top":27100,"left":16800,"diffRight":6900,"diffTop":4400,"diffLeft":14700,"check":100000}
+写真が点数表示ではない・読めない場合は {"error":"理由"}`;
+S.lastFile=null;
+function applyNames(){
+  const keys=POS.map(p=>p[0]);
+  for(let s=0;s<4;s++){const pi=(S.oya+s)%4;S.seats[s].n=S.table[keys[pi]]||"";}
+  S.seats.forEach((s,i)=>{const e=$("#n"+i);if(e)e.value=s.n;});
+  renderMemberChips();updateSum();
+}
+function syncSeat(k){const s=S.seats[k],inp=$("#s"+k);if(!inp)return;inp.value=s.v;inp.parentElement.classList.toggle("auto",!!s.auto);
+  const b=$$("#seats .sign")[k];if(b)b.setAttribute("aria-pressed",s.neg);}
+/* 3人入れたら残り1人は 合計−3人 で自動計算 */
+function autoFill(){
+  const target=S.rule.start*4;
+  const manual=S.seats.map(s=>!s.auto&&s.v!=="");
+  const nManual=manual.filter(Boolean).length;
+  const autoIdx=S.seats.findIndex(s=>s.auto);
+  if(nManual===3){
+    const k=manual.indexOf(false);
+    const sum=S.seats.reduce((a,s,i)=>a+(manual[i]?(s.neg?-1:1)*parseInt(s.v,10)*100:0),0);
+    const rest=target-sum;
+    if(autoIdx>=0&&autoIdx!==k){S.seats[autoIdx].auto=false;syncSeat(autoIdx);}
+    Object.assign(S.seats[k],{auto:true,neg:rest<0,v:String(Math.abs(rest)/100)});syncSeat(k);
+  }else if(autoIdx>=0&&nManual<3){Object.assign(S.seats[autoIdx],{auto:false,neg:false,v:""});syncSeat(autoIdx);}
+}
+function setHdr(){document.documentElement.style.setProperty("--hdr",$("header.top").offsetHeight+"px");}
+setHdr();window.addEventListener("resize",setHdr);
+$("#refImg").addEventListener("click",()=>$("#refWrap").classList.toggle("big"));
+$("#photo").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;
+  S.lastFile=f;S.lastRead=null;$("#photoResult").hidden=true;
+  if(S.lastImg)URL.revokeObjectURL(S.lastImg);S.lastImg=URL.createObjectURL(f);
+  $("#refImg").src=S.lastImg;$("#refWrap").hidden=false;$("#refWrap").classList.remove("big");
+  S.seats.forEach(s=>Object.assign(s,{v:"",neg:false,auto:false}));renderSeats();applyNames();
+  $("#aiRead").hidden=!S.sample;
+  toast("写真を見ながら3人分を入力してください");
+  setTimeout(()=>{const i=$("#s0");if(i)i.focus();},300);
+});
+$("#aiRead").addEventListener("click",async()=>{
+  const f=S.lastFile;if(!f||!S.sample)return;
+  const btn=$("#aiRead");btn.disabled=true;const orig=btn.textContent;btn.textContent="読み取り中…（数十秒かかることがあります）";
+  try{
+    const r=await S.sample.json(READ_PROMPT,{images:[f]});
+    if(!r||r.error){toast(r&&r.error?"読み取れませんでした："+r.error:"読み取れませんでした");return;}
+    const nums=["bottom","right","top","left"].map(k=>Number(r[k]));
+    if(nums.some(n=>!isFinite(n))){toast("4人分の点数が読み取れませんでした。撮り直してください");return;}
+    [r.bottom,r.right,r.top,r.left]=nums;
+    ["diffRight","diffTop","diffLeft","check"].forEach(k=>{r[k]=r[k]==null||!isFinite(Number(r[k]))?null:Number(r[k]);});
+    S.lastRead=r;applyRead(r);toast("読み取った点数を席に入れました");
+  }catch(err){
+    const c=err&&err.code;
+    if(c==="not_granted"||c==="sampling_disabled"||c==="images_unavailable"){S.sample=null;btn.hidden=true;toast("この環境では自動読み取りが使えません");}
+    else if(c==="image_rejected")toast("この画像は使えません。JPEGかPNGの写真を選んでください");
+    else if(c==="rate_limited")toast("読み取りが混み合っています。少し待ってからもう一度");
+    else if(c!=="cancelled")toast("読み取れませんでした。もう一度お試しください");
+  }finally{btn.disabled=false;btn.textContent=orig;}
+});
+renderTable();
+
+/* ---- プレイヤー別 対戦成績 ---- */
+const PLABEL={all:"全期間",month:"今月",last:"先月",year:"今年"};
+let openPlayer=null;
+function renderPlayer(){
+  const name=openPlayer;if(!name)return;
+  const sample=S.games.length===0;
+  const games=(sample?sampleGames():S.games).filter(inPeriod).filter(g=>g.players.some(p=>p.name===name));
+  $("#sheetName").textContent=name;
+  if(!games.length){$("#sheetBody").innerHTML=`<div class="empty">${PLABEL[S.period]}の対局はありません</div>`;return;}
+  let pt=0,rs=[0,0,0,0],best=-Infinity,worst=Infinity,sumScore=0,maxPt=-Infinity;
+  const vs=new Map();
+  for(const g of games){
+    const me=g.players.find(p=>p.name===name);
+    pt+=me.pt;rs[me.rank-1]++;best=Math.max(best,me.score);worst=Math.min(worst,me.score);sumScore+=me.score;maxPt=Math.max(maxPt,me.pt);
+    for(const o of g.players){if(o.name===name)continue;
+      const v=vs.get(o.name)||{name:o.name,n:0,win:0,lose:0,diff:0};
+      v.n++;if(me.rank<o.rank)v.win++;else v.lose++;v.diff+=me.pt-o.pt;vs.set(o.name,v);}
+  }
+  pt=r1(pt);const n=games.length;
+  const avg=(rs.reduce((s,c,k)=>s+c*(k+1),0)/n).toFixed(2);
+  const rentai=((rs[0]+rs[1])/n*100).toFixed(0);
+  const ykc=S.yaku.filter(y=>y.who===name).length;
+  const opp=[...vs.values()].sort((a,b)=>b.n-a.n||b.diff-a.diff);
+  const recent=games.slice(0,10);
+  $("#sheetBody").innerHTML=`
+    ${sample?`<div class="notice"><span class="sample-tag">サンプル</span> 例のデータで表示しています</div>`:""}
+    <h2>${PLABEL[S.period]}の成績</h2>
+    <div class="stats">
+      <div class="stat big"><span>通算ポイント</span><b class="${ptCls(pt)}">${fmtPt(pt)}</b></div>
+      <div class="stat"><span>半荘数</span><b>${n}</b></div>
+      <div class="stat"><span>平均順位</span><b>${avg}</b></div>
+      <div class="stat"><span>平均pt</span><b class="${ptCls(pt/n)}">${fmtPt(r1(pt/n))}</b></div>
+      <div class="stat"><span>トップ率</span><b>${(rs[0]/n*100).toFixed(0)}%</b></div>
+      <div class="stat"><span>連対率</span><b>${rentai}%</b></div>
+      <div class="stat"><span>ラス回避率</span><b>${((1-rs[3]/n)*100).toFixed(0)}%</b></div>
+      <div class="stat"><span>最高素点</span><b>${best.toLocaleString()}</b></div>
+      <div class="stat"><span>最低素点</span><b>${worst.toLocaleString()}</b></div>
+      <div class="stat"><span>役満</span><b>${ykc}回</b></div>
+    </div>
+    <div class="card"><h2>着順分布</h2>
+      <div class="rkbars">${rs.map((c,k)=>`<span>${k+1}着</span><div class="bar"><i class="d${k+1}" style="width:${c/n*100}%"></i></div><span class="num">${c}回 ${(c/n*100).toFixed(0)}%</span>`).join("")}</div>
+    </div>
+    <div class="card"><h2>対戦相手別</h2>
+      <p class="hint">同卓した半荘で、相手より上の着順だった回数と、ポイント差の合計</p>
+      <div class="tablewrap"><table class="h2h">
+        <thead><tr><th>相手</th><th>同卓</th><th>勝-負</th><th>pt差</th></tr></thead>
+        <tbody>${opp.map(v=>`<tr><td>${esc(v.name)}</td><td>${v.n}</td><td><span class="wl"><i style="width:${v.win/v.n*100}%"></i></span>${v.win}-${v.lose}</td><td class="${ptCls(v.diff)}">${fmtPt(r1(v.diff))}</td></tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    <div class="card recent"><h2>最近の半荘</h2>
+      <div>${recent.map(g=>{const me=g.players.find(p=>p.name===name);const others=g.players.filter(p=>p.name!==name).map(p=>p.name).join("・");
+        return `<div class="rr"><span class="rkn r${me.rank}">${me.rank}</span><span class="vs"><span class="num">${esc(g.date.slice(5))}</span> vs ${esc(others)}</span><span class="num">${me.score.toLocaleString()}</span><span class="num ${ptCls(me.pt)}">${fmtPt(me.pt)}</span></div>`;}).join("")}</div>
+    </div>`;
+}
+function openSheet(name){openPlayer=name;renderPlayer();$("#sheet").hidden=false;$("#sheet").scrollTop=0;$("#sheetBack").focus();document.body.style.overflow="hidden";}
+function closeSheet(){const n=openPlayer;openPlayer=null;$("#sheet").hidden=true;document.body.style.overflow="";
+  const b=[...$$("button.rk")].find(x=>x.dataset.player===n);if(b)b.focus();}
+$("#ranking").addEventListener("click",e=>{const b=e.target.closest("button.rk");if(b)openSheet(b.dataset.player);});
+$("#sheetBack").onclick=closeSheet;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#sheet").hidden)closeSheet();});
+
+/* ---- boot ---- */
+$("#gdate").value=today();$("#ydate").value=today();
+renderSeats();applyNames();renderAll();
+
+/* ---- 保存先：Googleスプレッドシート（Apps Script）。未設定ならこの端末のみ ---- */
+const API_URL=(window.MJ_CONFIG&&window.MJ_CONFIG.apiUrl)||"";
+const PASS_LS="mj-pass-v1";
+function getPass(){try{return localStorage.getItem(PASS_LS)||"";}catch(e){return "";}}
+async function post(body){
+  for(let tryNo=0;tryNo<2;tryNo++){
+    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({...body,pass:getPass()})});
+    const j=await res.json();
+    if(j&&j.error==="passcode"){
+      const p=window.prompt(tryNo?"合言葉が違います。もう一度入力してください":"記録するには合言葉を入力してください");
+      if(!p)throw {code:"cancelled"};
+      try{localStorage.setItem(PASS_LS,p.trim());}catch(e){}
+      continue;
+    }
+    if(!j||j.error)throw {code:j&&j.error||"error"};
+    return j;
+  }
+  throw {code:"passcode"};
+}
+let loading=false;
+async function refresh(){
+  if(loading)return;loading=true;
+  try{
+    const res=await fetch(API_URL+(API_URL.includes("?")?"&":"?")+"t="+Date.now());
+    const d=await res.json();
+    S.games=(d.games||[]).filter(g=>Array.isArray(g.players)&&g.players.length===4)
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.at-a.at);
+    S.yaku=(d.yakuman||[]).filter(y=>y.who&&Array.isArray(y.yaku))
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.at-a.at);
+    const c=d.config||{};
+    if(c.rule&&Array.isArray(c.rule.uma)&&c.rule.uma.length===4)S.rule={start:+c.rule.start,ret:+c.rule.ret,uma:c.rule.uma.map(Number)};
+    if(c.table&&c.table.self&&!document.activeElement?.closest?.("#tblNames")){S.table={self:c.table.self,shimo:c.table.shimo||"",toimen:c.table.toimen||"",kami:c.table.kami||""};renderTable();}
+    renderAll();
+    $("#storeNote").innerHTML="<b>共有スプレッドシートに保存中</b><br>このURLを開いたメンバー全員が同じランキングを見て記録できます。";
+  }catch(e){
+    $("#storeNote").innerHTML="<b>共有データを読み込めませんでした</b><br>通信状況を確認して、ページを開き直してください。";
+  }finally{loading=false;}
+}
+/* 既存の記録処理（S.db.collection(...).add など）をそのまま使うための窓口 */
+const remoteDb={
+  collection:c=>({
+    add:async d=>{await post({action:"add",coll:c,item:d});await refresh();},
+    doc:id=>({delete:async()=>{await post({action:"del",coll:c,id});await refresh();}})
+  }),
+  doc:p=>({set:async d=>{await post({action:"setConfig",key:p.split("/")[1],value:d});await refresh();}})
+};
+if(API_URL){
+  S.db=remoteDb;
+  $("#storeNote").textContent="読み込み中…";
+  refresh();
+  setInterval(()=>{if(document.visibilityState==="visible")refresh();},30000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refresh();});
+}else{
+  lsLoad();renderAll();
+  $("#storeNote").innerHTML="<b>この端末だけに保存中</b><br>共有の保存先（スプレッドシート）がまだ設定されていません。";
+}
+</script>
+
+</body>
+</html>
