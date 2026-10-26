@@ -224,3 +224,12 @@ function doPost(e) {
     lock.releaseLock();
   }
 }
+
+/**
+ * 初回だけエディタで実行する：外部通信（Gemini）の許可を出すための関数。
+ * 関数の選択欄で authorize を選び「実行」→ 承認画面で「許可」。
+ */
+function authorize() {
+  const r = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/", { muteHttpExceptions: true });
+  Logger.log("外部通信OK: HTTP " + r.getResponseCode());
+}
