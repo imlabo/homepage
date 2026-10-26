@@ -95,16 +95,41 @@ const READ_PROMPT = [
   '点数表示が写っていない・読めない場合は {"error":"理由"}'
 ].join("\n");
 
-function models_() {
-  const m = PropertiesService.getScriptProperties().getProperty("GEMINI_MODEL");
-  const list = [m, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"].filter(Boolean);
+function ver_(n) {
+  const m = n.match(/gemini-(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+/* 今使える Flash 系モデルを Google に問い合わせ、新しい順に並べる（6時間キャッシュ） */
+function models_(key) {
+  const fixed = PropertiesService.getScriptProperties().getProperty("GEMINI_MODEL");
+  const cache = CacheService.getScriptCache();
+  let listed = null;
+  const c = cache.get("gemini_models");
+  if (c) listed = JSON.parse(c);
+  if (!listed) {
+    listed = [];
+    const r = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+      { headers: { "x-goog-api-key": key }, muteHttpExceptions: true });
+    if (r.getResponseCode() === 200) {
+      const all = (JSON.parse(r.getContentText()).models || [])
+        .filter(function (m) { return (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0; })
+        .map(function (m) { return m.name.replace(/^models\//, ""); })
+        .filter(function (n) { return /^gemini-.*flash/.test(n) && !/(lite|tts|image|live|audio|embed|exp)/.test(n); });
+      const stable = all.filter(function (n) { return !/preview/.test(n); });
+      listed = (stable.length ? stable : all).sort(function (a, b) { return ver_(b) - ver_(a) || a.length - b.length; }).slice(0, 3);
+      if (listed.length) cache.put("gemini_models", JSON.stringify(listed), 21600);
+    }
+  }
+  const list = [fixed].concat(listed, ["gemini-flash-latest"]).filter(Boolean);
   return list.filter(function (x, i) { return list.indexOf(x) === i; });
 }
 
 /* モデルが廃止・混雑していたら次の候補で再試行する */
 function gemini_(key, parts, json) {
   let last = null;
-  const models = models_();
+  const errors = [];
+  const models = models_(key);
   for (let i = 0; i < models.length; i++) {
     const res = UrlFetchApp.fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/" + models[i] + ":generateContent",
@@ -121,7 +146,8 @@ function gemini_(key, parts, json) {
     );
     const code = res.getResponseCode();
     if (code === 200) return { ok: true, model: models[i], res: res };
-    last = { error: "api_error", model: models[i], status: code, detail: res.getContentText().slice(0, 300) };
+    errors.push(models[i] + ":" + code);
+    last = { error: "api_error", model: models[i], status: code, detail: "試したモデル " + errors.join(", ") + " / " + res.getContentText().slice(0, 240) };
     if (code === 400 || code === 401 || code === 403) break; // キーの問題は他のモデルでも同じ
   }
   return last;
