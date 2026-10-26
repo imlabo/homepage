@@ -65,7 +65,19 @@ function readAll_() {
   return res;
 }
 
-function doGet() {
+function doGet(e) {
+  // 接続確認：ブラウザで「ウェブアプリのURL?test=gemini」を開く
+  if (e && e.parameter && e.parameter.test === "gemini") {
+    const key = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+    if (!key) return out_({ error: "no_api_key", hint: "スクリプト プロパティに GEMINI_API_KEY がありません" });
+    try {
+      const g = gemini_(key, [{ text: "「OK」とだけ答えて" }], false);
+      if (!g.ok) return out_(g);
+      return out_({ ok: true, model: g.model, reply: g.res.getContentText().slice(0, 200) });
+    } catch (err) {
+      return out_({ error: "exception", detail: String(err) });
+    }
+  }
   return out_(readAll_());
 }
 
@@ -83,31 +95,48 @@ const READ_PROMPT = [
   '点数表示が写っていない・読めない場合は {"error":"理由"}'
 ].join("\n");
 
-function readScores_(req) {
-  const props = PropertiesService.getScriptProperties();
-  const key = props.getProperty("GEMINI_API_KEY");
-  if (!key) return { error: "no_api_key" };
-  const model = props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash";
-  if (!req.image || String(req.image).length > 8000000) return { error: "bad_image" };
-  const res = UrlFetchApp.fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
-    {
-      method: "post",
-      contentType: "application/json",
-      headers: { "x-goog-api-key": key },
-      muteHttpExceptions: true,
-      payload: JSON.stringify({
-        contents: [{ parts: [
-          { inline_data: { mime_type: req.mime || "image/jpeg", data: req.image } },
-          { text: READ_PROMPT }
-        ] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0 }
-      })
-    }
-  );
-  if (res.getResponseCode() !== 200) {
-    return { error: "api_error", status: res.getResponseCode(), detail: res.getContentText().slice(0, 300) };
+function models_() {
+  const m = PropertiesService.getScriptProperties().getProperty("GEMINI_MODEL");
+  const list = [m, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"].filter(Boolean);
+  return list.filter(function (x, i) { return list.indexOf(x) === i; });
+}
+
+/* モデルが廃止・混雑していたら次の候補で再試行する */
+function gemini_(key, parts, json) {
+  let last = null;
+  const models = models_();
+  for (let i = 0; i < models.length; i++) {
+    const res = UrlFetchApp.fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/" + models[i] + ":generateContent",
+      {
+        method: "post",
+        contentType: "application/json",
+        headers: { "x-goog-api-key": key },
+        muteHttpExceptions: true,
+        payload: JSON.stringify({
+          contents: [{ parts: parts }],
+          generationConfig: json ? { responseMimeType: "application/json", temperature: 0 } : { temperature: 0 }
+        })
+      }
+    );
+    const code = res.getResponseCode();
+    if (code === 200) return { ok: true, model: models[i], res: res };
+    last = { error: "api_error", model: models[i], status: code, detail: res.getContentText().slice(0, 300) };
+    if (code === 400 || code === 401 || code === 403) break; // キーの問題は他のモデルでも同じ
   }
+  return last;
+}
+
+function readScores_(req) {
+  const key = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+  if (!key) return { error: "no_api_key" };
+  if (!req.image || String(req.image).length > 8000000) return { error: "bad_image" };
+  const g = gemini_(key, [
+    { inline_data: { mime_type: req.mime || "image/jpeg", data: req.image } },
+    { text: READ_PROMPT }
+  ], true);
+  if (!g.ok) return g;
+  const res = g.res;
   try {
     const body = JSON.parse(res.getContentText());
     const text = body.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("");
@@ -125,7 +154,11 @@ function doPost(e) {
   const pass0 = PropertiesService.getScriptProperties().getProperty("PASSCODE");
   if (req0.action === "read") {
     if (pass0 && String(req0.pass || "") !== pass0) return out_({ error: "passcode" });
-    return out_(readScores_(req0)); // 読み取りは書き込みロック不要
+    try {
+      return out_(readScores_(req0)); // 読み取りは書き込みロック不要
+    } catch (err) {
+      return out_({ error: "exception", detail: String(err) });
+    }
   }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);

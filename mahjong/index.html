@@ -785,14 +785,14 @@ function getPass(){try{return localStorage.getItem(PASS_LS)||"";}catch(e){return
 async function post(body){
   for(let tryNo=0;tryNo<2;tryNo++){
     const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({...body,pass:getPass()})});
-    const j=await res.json();
+    let j;try{j=await res.json();}catch(e){throw {code:"bad_response",detail:"HTTP "+res.status};}
     if(j&&j.error==="passcode"){
       const p=window.prompt(tryNo?"合言葉が違います。もう一度入力してください":"記録するには合言葉を入力してください");
       if(!p)throw {code:"cancelled"};
       try{localStorage.setItem(PASS_LS,p.trim());}catch(e){}
       continue;
     }
-    if(!j||j.error)throw {code:j&&j.error||"error"};
+    if(!j||j.error)throw {code:j&&j.error||"error",status:j&&j.status,detail:j&&j.detail,model:j&&j.model};
     return j;
   }
   throw {code:"passcode"};
@@ -854,6 +854,7 @@ async function autoRead(f){
     const msg={no_api_key:"自動読み取りの設定がまだです。手入力してください",unreadable:"点数を読み取れませんでした。撮り直すか手入力してください",cancelled:""}[c];
     const m=msg===undefined?"読み取りに失敗しました。手入力してください":msg;
     if(m)toast(m);
+    if(c&&c!=="cancelled"){const el=$("#photoResult");el.innerHTML=`<div class="st ng" style="grid-column:1/-1;word-break:break-all">${esc(m||"読み取りエラー")}<br><small>原因: ${esc(c)}${err.status?" / HTTP "+esc(err.status):""}${err.model?" / "+esc(err.model):""}${err.detail?"<br>"+esc(String(err.detail).slice(0,240)):""}</small></div>`;el.hidden=false;}
     ai.textContent="もう一度読み取る";ai.hidden=false;
     setTimeout(()=>{const i=$("#s0");if(i)i.focus();},300);
   }finally{btn.classList.remove("busy");lbl.textContent=orig;}
