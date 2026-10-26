@@ -131,24 +131,35 @@ function gemini_(key, parts, json) {
   const errors = [];
   const models = models_(key);
   for (let i = 0; i < models.length; i++) {
-    const res = UrlFetchApp.fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/" + models[i] + ":generateContent",
-      {
-        method: "post",
-        contentType: "application/json",
-        headers: { "x-goog-api-key": key },
-        muteHttpExceptions: true,
-        payload: JSON.stringify({
-          contents: [{ parts: parts }],
-          generationConfig: json ? { responseMimeType: "application/json", temperature: 0 } : { temperature: 0 }
-        })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = UrlFetchApp.fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + models[i] + ":generateContent",
+        {
+          method: "post",
+          contentType: "application/json",
+          headers: { "x-goog-api-key": key },
+          muteHttpExceptions: true,
+          payload: JSON.stringify({
+            contents: [{ parts: parts }],
+            generationConfig: json ? { responseMimeType: "application/json", temperature: 0 } : { temperature: 0 }
+          })
+        }
+      );
+      const code = res.getResponseCode();
+      if (code === 200) return { ok: true, model: models[i], res: res };
+      const text = res.getContentText();
+      errors.push(models[i] + ":" + code);
+      last = { error: code === 429 ? "rate_limited" : "api_error", model: models[i], status: code,
+               detail: "試したモデル " + errors.join(", ") + " / " + text.slice(0, 240) };
+      if (code === 400 || code === 401 || code === 403) return last; // キーの問題は他のモデルでも同じ
+      // 混雑(503)や回数制限(429)は、待ち時間が短ければ少し待って同じモデルでもう一度
+      if ((code === 429 || code === 503 || code === 500) && attempt === 0) {
+        const m = text.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+        const wait = m ? parseFloat(m[1]) : 3;
+        if (wait <= 15) { Utilities.sleep(Math.ceil(wait * 1000) + 500); continue; }
       }
-    );
-    const code = res.getResponseCode();
-    if (code === 200) return { ok: true, model: models[i], res: res };
-    errors.push(models[i] + ":" + code);
-    last = { error: "api_error", model: models[i], status: code, detail: "試したモデル " + errors.join(", ") + " / " + res.getContentText().slice(0, 240) };
-    if (code === 400 || code === 401 || code === 403) break; // キーの問題は他のモデルでも同じ
+      break; // 次のモデルへ（回数制限はモデルごとに別枠）
+    }
   }
   return last;
 }

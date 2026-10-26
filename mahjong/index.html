@@ -469,7 +469,7 @@ function setTab(t){
   window.scrollTo(0,0);
 }
 
-let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),2000);}
+let toastT;function toast(m,ms){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),ms||2000);}
 
 /* ---- 保存先：共有DB（なければこの端末） ---- */
 const LS="mj-ranking-v1";
@@ -851,12 +851,13 @@ async function autoRead(f){
     S.lastRead=r;applyRead(r);toast("点数を入れました。写真と見比べて確認してください");
   }catch(err){
     const c=err&&err.code;
-    const msg={no_api_key:"自動読み取りの設定がまだです。手入力してください",unreadable:"点数を読み取れませんでした。撮り直すか手入力してください",cancelled:""}[c];
-    const m=msg===undefined?"読み取りに失敗しました。手入力してください":msg;
-    if(m)toast(m);
+    const msg={no_api_key:"自動読み取りの設定がまだです。手入力してください",unreadable:"点数を読み取れませんでした。撮り直すか手入力してください",
+      rate_limited:"Geminiの無料枠の回数制限です。1分ほど待って「もう一度読み取る」を押してください",cancelled:""}[c];
+    const m=msg===undefined?`読み取りに失敗しました（${c||"不明"}${err&&err.status?" "+err.status:""}）。手入力してください`:msg;
+    if(m)toast(m,6000);
     if(c&&c!=="cancelled"){const el=$("#photoResult");el.innerHTML=`<div class="st ng" style="grid-column:1/-1;word-break:break-all">${esc(m||"読み取りエラー")}<br><small>原因: ${esc(c)}${err.status?" / HTTP "+esc(err.status):""}${err.model?" / "+esc(err.model):""}${err.detail?"<br>"+esc(String(err.detail).slice(0,240)):""}</small></div>`;el.hidden=false;}
     ai.textContent="もう一度読み取る";ai.hidden=false;
-    setTimeout(()=>{const i=$("#s0");if(i)i.focus();},300);
+    $("#photoCard").scrollIntoView({block:"start"});
   }finally{btn.classList.remove("busy");lbl.textContent=orig;}
 }
 $("#aiRead").addEventListener("click",()=>{if(S.lastFile&&API_URL)autoRead(S.lastFile);});
