@@ -10,6 +10,13 @@
  *    次のユーザーとして実行：自分 ／ アクセスできるユーザー：全員
  * 5. 表示された「ウェブアプリのURL」を mahjong/config.js の apiUrl に貼る
  *
+ * 写真からの自動読み取り（任意）
+ * - Google AI Studio（https://aistudio.google.com/apikey）で API キーを作り、
+ *   スクリプト プロパティ GEMINI_API_KEY に設定する（無料枠あり）
+ * - モデルを変えたいときは GEMINI_MODEL（既定 gemini-2.5-flash）
+ * - コードを更新したら「デプロイを管理 → 編集 → バージョン：新バージョン → デプロイ」
+ *   （URLを変えずに反映できる。「新しいデプロイ」だとURLが変わるので注意）
+ *
  * シート games / yakuman / config は初回アクセス時に自動で作られる。
  * 最後の json 列がアプリの読み込み元。ほかの列は人が見るための写し。
  */
@@ -62,12 +69,69 @@ function doGet() {
   return out_(readAll_());
 }
 
+/* ---- 写真から点数を読み取る（Gemini API・無料枠で利用可） ---- */
+const READ_PROMPT = [
+  "これは全自動麻雀卓の点数表示（液晶）の写真です。4人の持ち点を読み取ってください。",
+  "表示の配置:",
+  "- 中央下の一番大きい数字 = 手前（撮影者）の持ち点 → bottom",
+  "- 右側の大きい数字 → right、上側中央の大きい数字 → top、左側の大きい数字 → left",
+  "- 右・上・左の大きい数字の下にある小さい数字（記号付き）は手前との点差。記号は無視して絶対値を diffRight diffTop diffLeft に。無ければ null",
+  "- 右上の CHECK の数字は合計 → check（無ければ null）",
+  "- 1ST/2ND/3RD/4TH などの順位表示は無視",
+  "持ち点がマイナスの人は負の数に。7セグメント表示なので 0と8、1と7、5と6 の読み違いに注意し、点差・合計と矛盾しないか確かめること。",
+  'JSONのみで答える。例: {"bottom":31500,"right":24600,"top":27100,"left":16800,"diffRight":6900,"diffTop":4400,"diffLeft":14700,"check":100000}',
+  '点数表示が写っていない・読めない場合は {"error":"理由"}'
+].join("\n");
+
+function readScores_(req) {
+  const props = PropertiesService.getScriptProperties();
+  const key = props.getProperty("GEMINI_API_KEY");
+  if (!key) return { error: "no_api_key" };
+  const model = props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash";
+  if (!req.image || String(req.image).length > 8000000) return { error: "bad_image" };
+  const res = UrlFetchApp.fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
+    {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-goog-api-key": key },
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{ parts: [
+          { inline_data: { mime_type: req.mime || "image/jpeg", data: req.image } },
+          { text: READ_PROMPT }
+        ] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0 }
+      })
+    }
+  );
+  if (res.getResponseCode() !== 200) {
+    return { error: "api_error", status: res.getResponseCode(), detail: res.getContentText().slice(0, 300) };
+  }
+  try {
+    const body = JSON.parse(res.getContentText());
+    const text = body.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("");
+    const m = text.match(/\{[\s\S]*\}/);
+    const j = JSON.parse(m ? m[0] : text);
+    if (j.error) return { error: "unreadable", detail: String(j.error) };
+    return { ok: true, scores: j };
+  } catch (err) {
+    return { error: "parse_error" };
+  }
+}
+
 function doPost(e) {
+  const req0 = JSON.parse(e.postData.contents);
+  const pass0 = PropertiesService.getScriptProperties().getProperty("PASSCODE");
+  if (req0.action === "read") {
+    if (pass0 && String(req0.pass || "") !== pass0) return out_({ error: "passcode" });
+    return out_(readScores_(req0)); // 読み取りは書き込みロック不要
+  }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const req = JSON.parse(e.postData.contents);
-    const pass = PropertiesService.getScriptProperties().getProperty("PASSCODE");
+    const req = req0;
+    const pass = pass0;
     if (pass && String(req.pass || "") !== pass) return out_({ error: "passcode" });
 
     if (req.action === "add") {

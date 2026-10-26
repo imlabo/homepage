@@ -239,7 +239,7 @@ button.rk:active{transform:scale(.99)}
       </div>
       <input type="file" id="photo" accept="image/*" hidden>
       <label class="btn" for="photo" id="photoBtn"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>点数表示を撮る</label>
-      <p class="hint" id="photoHint">撮った写真が入力欄の上に固定表示されます。それを見ながら3人分の上3桁を入れると、残り1人は合計から自動で入ります。表示部分をアップで撮ると読みやすくなります。</p>
+      <p class="hint" id="photoHint">撮ると点数が自動で入ります（10秒ほど）。写真は入力欄の上に固定表示されるので、見比べて確認してから登録してください。読み取れないときは3人分を手入力すれば、残り1人は自動計算されます。</p>
       <button class="btn ghost" id="aiRead" hidden></button>
       <div class="pr" id="photoResult" hidden></div>
       <details class="tbl">
@@ -687,7 +687,8 @@ $("#photo").addEventListener("change",e=>{
   if(S.lastImg)URL.revokeObjectURL(S.lastImg);S.lastImg=URL.createObjectURL(f);
   $("#refImg").src=S.lastImg;$("#refWrap").hidden=false;$("#refWrap").classList.remove("big");
   S.seats.forEach(s=>Object.assign(s,{v:"",neg:false,auto:false}));renderSeats();applyNames();
-  $("#aiRead").hidden=!S.sample;
+  $("#aiRead").hidden=true;
+  if(API_URL){autoRead(f);return;}
   toast("写真を見ながら3人分を入力してください");
   setTimeout(()=>{const i=$("#s0");if(i)i.focus();},300);
 });
@@ -823,6 +824,41 @@ const remoteDb={
   }),
   doc:p=>({set:async d=>{await post({action:"setConfig",key:p.split("/")[1],value:d});await refresh();}})
 };
+
+/* ---- 写真から自動読み取り（Apps Script 経由で Gemini） ---- */
+async function toJpegB64(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((ok,ng)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ng;i.src=url;});
+    const sc=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*sc);c.height=Math.round(img.naturalHeight*sc);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    return c.toDataURL("image/jpeg",0.85).split(",")[1];
+  }finally{URL.revokeObjectURL(url);}
+}
+async function autoRead(f){
+  const btn=$("#photoBtn"),ai=$("#aiRead"),lbl=btn.lastChild,orig=lbl.textContent;
+  btn.classList.add("busy");lbl.textContent="点数を読み取り中…";ai.hidden=true;
+  try{
+    const image=await toJpegB64(f);
+    const j=await post({action:"read",image,mime:"image/jpeg"});
+    const r=j.scores||{};
+    const nums=["bottom","right","top","left"].map(k=>Number(r[k]));
+    if(nums.some(n=>!isFinite(n)))throw {code:"unreadable"};
+    [r.bottom,r.right,r.top,r.left]=nums;
+    ["diffRight","diffTop","diffLeft","check"].forEach(k=>{r[k]=r[k]==null||!isFinite(Number(r[k]))?null:Number(r[k]);});
+    if(S.lastFile!==f)return;
+    S.lastRead=r;applyRead(r);toast("点数を入れました。写真と見比べて確認してください");
+  }catch(err){
+    const c=err&&err.code;
+    const msg={no_api_key:"自動読み取りの設定がまだです。手入力してください",unreadable:"点数を読み取れませんでした。撮り直すか手入力してください",cancelled:""}[c];
+    const m=msg===undefined?"読み取りに失敗しました。手入力してください":msg;
+    if(m)toast(m);
+    ai.textContent="もう一度読み取る";ai.hidden=false;
+    setTimeout(()=>{const i=$("#s0");if(i)i.focus();},300);
+  }finally{btn.classList.remove("busy");lbl.textContent=orig;}
+}
+$("#aiRead").addEventListener("click",()=>{if(S.lastFile&&API_URL)autoRead(S.lastFile);});
 if(API_URL){
   S.db=remoteDb;
   $("#storeNote").textContent="読み込み中…";
